@@ -19,7 +19,7 @@ def get_plot_sample(df_predictions, nr_of_source_mol=50, range_evaluation=""):
     nr_of_source_mol = min(nr_of_source_mol, len((df_predictions)))
     sampled_index = random.sample(list(range(len(df_predictions))), nr_of_source_mol)
     molecules, green_boxes, red_boxes, all_tuples_mol, matches_list = _create_boxes_and_molecules(
-        df_predictions, sampled_index, nr_of_source_mol, range_evaluation=range_evaluation
+        df_predictions, sampled_index, nr_of_source_mol
     )
 
     # Get legends
@@ -358,7 +358,7 @@ def _get_legends(predictions, molecules, all_gen_mols, sampled_indices, range_ev
     return legends
 
 
-def _create_boxes_and_molecules(predictions, sampled_indices, nr_of_source_mol, range_evaluation=""):
+def _create_boxes_and_molecules(predictions, sampled_indices, nr_of_source_mol):
     # This function calculates how many green-boxes and red-boxes (and their type) to add to each batch of generated molecules.
     # Initiate arrays to store data in
     green_boxes = np.zeros(nr_of_source_mol)
