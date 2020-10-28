@@ -11,7 +11,6 @@ SEED = 0
 IMG_SIZE = 300
 MOLS_PER_ROW = 6
 NUM_SAMPLES = 10
-LOGD_THRESHOLD = cfgd.PROPERTY_ERROR['LogD']
 
 
 def get_plot_sample(df_predictions, nr_of_source_mol=50, range_evaluation=""):
@@ -262,15 +261,15 @@ def _add_property_threshold_test(img, i, range_evaluation):
     )
     if range_evaluation == 'lower':
         ImageDraw.Draw(img).text(
-            (160, 31 + IMG_SIZE * 2 * i), f"LogD upper fluctuation {LOGD_THRESHOLD}", (0, 0, 0)
+            (160, 31 + IMG_SIZE * 2 * i), f"LogD upper fluctuation {cfgd.PROPERTY_ERROR['LogD']}", (0, 0, 0)
         )
     elif range_evaluation == 'higher':
         ImageDraw.Draw(img).text(
-            (160, 31 + IMG_SIZE * 2 * i), f"LogD lower fluctuation {LOGD_THRESHOLD}", (0, 0, 0)
+            (160, 31 + IMG_SIZE * 2 * i), f"LogD lower fluctuation {cfgd.PROPERTY_ERROR['LogD']}", (0, 0, 0)
         )
     else:
         ImageDraw.Draw(img).text(
-            (160, 31 + IMG_SIZE * 2 * i), f"Required abs(delta-LogD) <= {LOGD_THRESHOLD}", (0, 0, 0)
+            (160, 31 + IMG_SIZE * 2 * i), f"Required abs(delta-LogD) <= {cfgd.PROPERTY_ERROR['LogD']}", (0, 0, 0)
         )
     ImageDraw.Draw(img).text(
         (160, 45 + IMG_SIZE * 2 * i),
@@ -392,19 +391,7 @@ def _create_boxes_and_molecules(predictions, sampled_indices, nr_of_source_mol, 
             if row["Predicted_smi_" + str(j)] == 0:
                 generated_mols.append("NOSMILE")
             else:
-                # Calucalte delta_logD and classes for Solubility and Clint
-                not_satisfy = True
-                if range_evaluation == "":
-                    if abs(row["Delta_LogD_predict_" + str(j)] - row["Delta_LogD_ori"]) < LOGD_THRESHOLD:
-                        not_satisfy = False
-                elif range_evaluation == "lower":
-                    pred_logD, source_logD = row[f'Predict_smi_{j}_cLogD'], row['Source_Mol_LogD']
-                    if pred_logD >= cfgd.LOD_MIN and pred_logD < min(source_logD  + LOGD_THRESHOLD, cfgd.LOD_MAX):
-                        not_satisfy = False
-                elif range_evaluation == "higher":
-                    pred_logD, source_logD = row[f'Predict_smi_{j}_cLogD'], row['Source_Mol_LogD']
-                    if pred_logD > max(source_logD - LOGD_THRESHOLD, cfgd.LOD_MIN) and pred_logD <= cfgd.LOD_MAX:
-                        not_satisfy = False
+                not_satisfy = 1-row['Predict_eval_{}_{}_{}'.format(j, 'LogD', cfgd.PROPERTY_ERROR['LogD'])]
 
                 save_info = (not_satisfy, row['num_correct_allprop_sumoversample_allerror'])
 
