@@ -1,0 +1,11 @@
+temp/
+log/
+
+compute_properties.py
+
+__pycache__
+*.pyc
+.idea
+.unison*
+
+*.sh
