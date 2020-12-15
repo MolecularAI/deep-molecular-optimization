@@ -7,7 +7,7 @@ from models.transformer.encode_decode.layer_norm import LayerNorm
 class Decoder(nn.Module):
     "Generic N layer decoder with masking."
 
-    def __init__(self, layer, N, d_model):
+    def __init__(self, layer, N):
         super(Decoder, self).__init__()
         self.layers = clones(layer, N)
         self.norm = LayerNorm(layer.size)

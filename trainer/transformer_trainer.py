@@ -37,8 +37,9 @@ class TransformerTrainer(BaseTrainer):
         return model
 
     def _initialize_optimizer(self, model, opt):
-        optim = moptim(model.src_embed[0].d_model, opt.learning_rate, opt.warmup_steps,
-                       torch.optim.Adam(model.parameters(), lr=0, betas=(0.9, 0.98), eps=1e-9))
+        optim = moptim(model.src_embed[0].d_model, opt.factor, opt.warmup_steps,
+                       torch.optim.Adam(model.parameters(), lr=0, betas=(opt.adam_beta1, opt.adam_beta2),
+                                        eps=opt.adam_eps))
         return optim
 
     def _load_optimizer_from_epoch(self, model, file_name):
@@ -46,7 +47,7 @@ class TransformerTrainer(BaseTrainer):
         checkpoint = torch.load(file_name, map_location='cuda:0')
         optim_dict = checkpoint['optimizer_state_dict']
         optim = moptim(optim_dict['model_size'], optim_dict['factor'], optim_dict['warmup'],
-        torch.optim.Adam(model.parameters(), lr=0, betas=(0.9, 0.98), eps=1e-9))
+                       torch.optim.Adam(model.parameters(), lr=0))
         optim.load_state_dict(optim_dict)
         return optim
 
@@ -66,12 +67,12 @@ class TransformerTrainer(BaseTrainer):
         total_loss = 0
         total_tokens = 0
         for i, batch in enumerate(ul.progress_bar(dataloader, total=len(dataloader))):
-            src, source_length, trg, src_mask, trg_mask, max_length_target, _ = batch
+            src, source_length, trg, src_mask, trg_mask, _, _ = batch
 
             trg_y = trg[:, 1:].to(device)  # skip start token
 
             # number of tokens without padding
-            ntokens = (trg_y != pad).data.sum()
+            ntokens = float((trg_y != pad).data.sum())
 
             # Move to GPU
             src = src.to(device)
@@ -83,7 +84,7 @@ class TransformerTrainer(BaseTrainer):
             out = model.forward(src, trg, src_mask, trg_mask)
             loss = loss_compute(out, trg_y, ntokens)
             total_tokens += ntokens
-            total_loss += loss
+            total_loss += float(loss)
 
         loss_epoch = total_loss / total_tokens
 
@@ -100,12 +101,12 @@ class TransformerTrainer(BaseTrainer):
         tokenizer = mv.SMILESTokenizer()
         for i, batch in enumerate(ul.progress_bar(dataloader, total=len(dataloader))):
 
-            src, source_length, trg, src_mask, trg_mask, max_length_target, _ = batch
+            src, source_length, trg, src_mask, trg_mask, _, _ = batch
 
             trg_y = trg[:, 1:].to(device)  # skip start token
 
             # number of tokens without padding
-            ntokens = (trg_y != pad).data.sum()
+            ntokens = float((trg_y != pad).data.sum())
 
             # Move to GPU
             src = src.to(device)
@@ -113,24 +114,24 @@ class TransformerTrainer(BaseTrainer):
             src_mask = src_mask.to(device)
             trg_mask = trg_mask.to(device)
 
-            # Compute loss with teaching forcing
-            out = model.forward(src, trg, src_mask, trg_mask)
-            loss = loss_compute(out, trg_y, ntokens)
-            total_loss += loss
-            total_tokens += ntokens
+            with torch.no_grad():
+                # Compute loss with teaching forcing
+                out = model.forward(src, trg, src_mask, trg_mask)
+                loss = loss_compute(out, trg_y, ntokens)
+                total_loss += float(loss)
+                total_tokens += ntokens
+                # Decode
+                max_length_target = cfgd.DATA_DEFAULT['max_sequence_length']
+                smiles = decode(model, src, src_mask, max_length_target, type='greedy')
 
-            # Decode
-            max_length_target = cfgd.DATA_DEFAULT['max_sequence_length']
-            smiles = decode(model, src, src_mask, max_length_target, type='greedy')
-
-            # Compute accuracy
-            for j in range(trg.size()[0]):
-                seq = smiles[j, :]
-                target = trg[j]
-                target = tokenizer.untokenize(vocab.decode(target.cpu().numpy()))
-                seq = tokenizer.untokenize(vocab.decode(seq.cpu().numpy()))
-                if seq == target:
-                    n_correct += 1
+                # Compute accuracy
+                for j in range(trg.size()[0]):
+                    seq = smiles[j, :]
+                    target = trg[j]
+                    target = tokenizer.untokenize(vocab.decode(target.cpu().numpy()))
+                    seq = tokenizer.untokenize(vocab.decode(seq.cpu().numpy()))
+                    if seq == target:
+                        n_correct += 1
 
             # number of samples in current batch
             n_trg = trg.size()[0]
@@ -202,13 +203,13 @@ class TransformerTrainer(BaseTrainer):
 
             self.LOG.info("Validation start")
             model.eval()
-            with torch.no_grad():
-                loss_epoch_validation, accuracy = self.validation_stat(
-                    dataloader_validation,
-                    model,
-                    SimpleLossCompute(
-                        model.generator, criterion, None),
-                    device, vocab)
+
+            loss_epoch_validation, accuracy = self.validation_stat(
+                dataloader_validation,
+                model,
+                SimpleLossCompute(
+                    model.generator, criterion, None),
+                device, vocab)
 
 
             self.LOG.info("Validation end")

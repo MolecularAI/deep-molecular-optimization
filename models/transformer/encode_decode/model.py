@@ -45,9 +45,9 @@ class EncoderDecoder(nn.Module):
         ff = PositionwiseFeedForward(d_model, d_ff, dropout)
         position = PositionalEncoding(d_model, dropout)
         model = EncoderDecoder(
-            Encoder(EncoderLayer(d_model, c(attn), c(ff), dropout), N, d_model),
+            Encoder(EncoderLayer(d_model, c(attn), c(ff), dropout), N),
             Decoder(DecoderLayer(d_model, c(attn), c(attn),
-                                 c(ff), dropout), N, d_model),
+                                 c(ff), dropout), N),
             nn.Sequential(Embeddings(d_model, src_vocab), c(position)),
             nn.Sequential(Embeddings(d_model, tgt_vocab), c(position)),
             Generator(d_model, tgt_vocab))

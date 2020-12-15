@@ -34,7 +34,7 @@ class NoamOpt:
             'warmup': self.warmup,
             'factor': self.factor,
             'model_size': self.model_size,
-            'rate': self.rate
+            'rate': self._rate
         }
 
     def load_state_dict(self, state_dict):

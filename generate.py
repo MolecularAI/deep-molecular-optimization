@@ -77,7 +77,7 @@ class GenerateRunner():
         sampled_smiles_list = []
         for j, batch in enumerate(ul.progress_bar(dataloader_test, total=len(dataloader_test))):
 
-            src, source_length, _, src_mask, _, max_length_target, df = batch
+            src, source_length, _, src_mask, _, _, df = batch
 
             # Move to GPU
             src = src.to(device)
@@ -120,6 +120,9 @@ class GenerateRunner():
         max_trials = 100  # Maximum trials for sampling
         current_trials = 0
 
+        if decode_type == 'greedy':
+            max_trials = 1
+
         # Set of unique starting molecules
         if src is not None:
             for ibatch in range(batch_size):
@@ -144,6 +147,9 @@ class GenerateRunner():
                 # sample molecule
                 if model_choice == 'transformer':
                     sequences = decode(model, src_current, mask_current, max_len, decode_type)
+                    padding = (0, max_len-sequences.shape[1],
+                               0, 0)
+                    sequences = torch.nn.functional.pad(sequences, padding)
                 elif model_choice == 'seq2seq':
                     sequences = self.sample_seq2seq(model, mask_current, batch_index_current, decoder_hidden,
                                                     encoder_outputs, max_len, device)

@@ -38,14 +38,9 @@ def train_opts_transformer(parser):
                        help="embedding dimension, model dimension")
     group.add_argument('-d-ff', type=int, default=2048,
                        help="dimension in feed forward network")
+    # Regularization
     group.add_argument('--dropout', type=float, default=0.1,
                        help="Dropout probability; applied in LSTM stacks.")
-    # Optimization options
-    group = parser.add_argument_group('Optimization')
-    group.add_argument('--learning-rate', type=float, default=1.0,
-                       help="""Starting learning rate""")
-    group.add_argument('--warmup-steps', type=int, default=4000,
-                       help="""Number of warmup steps for custom decay.""")
     group.add_argument('--label-smoothing', type=float, default=0.0,
                        help="""Label smoothing value epsilon.
                        Probabilities of all non-true labels
@@ -53,6 +48,21 @@ def train_opts_transformer(parser):
                        Set to zero to turn off label smoothing.
                        For more detailed information, see:
                        https://arxiv.org/abs/1512.00567""")
+    # Optimization options
+    group = parser.add_argument_group('Optimization')
+    group.add_argument('--factor', type=float, default=1.0,
+                       help="""Factor multiplied to the learning rate scheduler formula in NoamOpt. 
+                       For more information about the formula, 
+                       see paper Attention Is All You Need https://arxiv.org/pdf/1706.03762.pdf""")
+    group.add_argument('--warmup-steps', type=int, default=4000,
+                       help="""Number of warmup steps for custom decay.""")
+    group.add_argument('--adam-beta1', type=float, default=0.9,
+                       help="""The beta1 parameter for Adam optimizer""")
+    group.add_argument('--adam-beta2', type=float, default=0.98,
+                       help="""The beta2 parameter for Adam optimizer""")
+    group.add_argument('--adam-eps', type=float, default=1e-9,
+                       help="""The eps parameter for Adam optimizer""")
+
 
 def train_opts_seq2seq(parser):
     # Model architecture options
