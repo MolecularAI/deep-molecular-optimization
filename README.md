@@ -27,6 +27,7 @@ python preprocess.py --input-data-path data/chembl_02/mmp_prop.csv
 ```
 python train.py --data-path data/chembl_02 --save-directory train_transformer --model-choice transformer transformer
 ``` 
+A pre-trained Transformer model can be found [here](https://zenodo.org/record/5571965#.YWmMoZpBybi).
 3. Generate molecules
 
 Use the model saved at a given epoch (e.g. 60) to generate molecules for the given test filename, and save the results to `experiments/save_directory/test_file_name/evaluation_epoch/generated_molecules.csv`. The three test sets used in our paper can be found in `data/chembl_02/` as below,
