@@ -110,7 +110,7 @@ class GenerateRunner():
         num_valid_batch = np.zeros(batch_size)  # current number of unique and valid samples out of total sampled
         num_valid_batch_total = np.zeros(batch_size)  # current number of sampling times no matter unique or valid
         num_valid_batch_desired = np.asarray([num_samples] * batch_size)
-        unique_set_num_samples = [set()] * batch_size  # for each starting molecule
+        unique_set_num_samples = [set() for i in range(batch_size)]   # for each starting molecule
         batch_index = torch.LongTensor(range(batch_size))
         batch_index_current = torch.LongTensor(range(batch_size)).to(device)
         start_mols = []
@@ -125,8 +125,9 @@ class GenerateRunner():
 
         # Set of unique starting molecules
         if src is not None:
+            start_ind = len(cfgd.PROPERTIES)
             for ibatch in range(batch_size):
-                source_smi = self.tokenizer.untokenize(self.vocab.decode(src[ibatch].tolist()[3:]))
+                source_smi = self.tokenizer.untokenize(self.vocab.decode(src[ibatch].tolist()[start_ind:]))
                 source_smi = uc.get_canonical_smile(source_smi)
                 unique_set_num_samples[ibatch].add(source_smi)
                 start_mols.append(source_smi)

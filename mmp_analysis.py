@@ -196,11 +196,11 @@ def analyse_mmp_results(data_test, mmp_all_df, ratio_list, num_samples, tmp_path
 
     if is_only_desirable:
         LOG.info(
-            f"Ideally should generate {len(data_test)*10} molecules with desirable properties for {len(data_test)} starting molecules")
-        LOG.info(f"In fact generate {total_valid}({round(total_valid/len(data_test)*10, 2)}%)")
+            f"Ideally should generate {len(data_test)*num_samples} molecules with desirable properties for {len(data_test)} starting molecules")
+        LOG.info(f"In fact generate {total_valid}({round(total_valid/(len(data_test)*num_samples)*100, 2)}%)")
     else:
-        LOG.info(f"Theoretically should generate {len(data_test)*10} molecules for {len(data_test)} starting molecules")
-        LOG.info(f"In fact generate {total_valid}({round(total_valid/len(data_test)*10, 2)}%)")
+        LOG.info(f"Theoretically should generate {len(data_test)*num_samples} molecules for {len(data_test)} starting molecules")
+        LOG.info(f"In fact generate {total_valid}({round(total_valid/(len(data_test)*num_samples)*100, 2)}%)")
 
     for i, df in enumerate(mmp_df_list):
         LOG.info(f"===============Ratio={ratio_list[i]}================")

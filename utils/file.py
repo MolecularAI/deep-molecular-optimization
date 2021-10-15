@@ -2,7 +2,7 @@ import os
 
 def make_directory(file, is_dir=True):
     dirs = file.split('/')[:-1] if not is_dir else file.split('/')
-    path = ''
+    path = '/' if file.startswith('/') else ''
     for dir in dirs:
         path = os.path.join(path, dir)
         if not os.path.exists(path):

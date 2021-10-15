@@ -200,10 +200,10 @@ class TransformerTrainer(BaseTrainer):
                                                                  optim), device)
 
             self.LOG.info("Training end")
+            self.save(model, optim, epoch, vocab_size, opt)
 
             self.LOG.info("Validation start")
             model.eval()
-
             loss_epoch_validation, accuracy = self.validation_stat(
                 dataloader_validation,
                 model,
@@ -219,4 +219,3 @@ class TransformerTrainer(BaseTrainer):
                                                                            accuracy))
 
             self.to_tensorboard(loss_epoch_train, loss_epoch_validation, accuracy, epoch)
-            self.save(model, optim, epoch, vocab_size, opt)
