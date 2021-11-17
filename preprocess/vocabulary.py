@@ -120,7 +120,7 @@ class SMILESTokenizer:
         return smi
 
 
-def create_vocabulary(smiles_list, tokenizer, property_condition=None):
+def create_vocabulary(smiles_list, tokenizer):
     """Creates a vocabulary for the SMILES syntax."""
     tokens = set()
     for smi in smiles_list:
@@ -128,8 +128,6 @@ def create_vocabulary(smiles_list, tokenizer, property_condition=None):
 
     vocabulary = Vocabulary()
     vocabulary.update(["*", "^", "$"] + sorted(tokens))  # pad=0, start=1, end=2
-    if property_condition is not None:
-        vocabulary.update(property_condition)
     # for random smiles
     if "8" not in vocabulary.tokens():
         vocabulary.update(["8"])

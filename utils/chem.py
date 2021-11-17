@@ -57,7 +57,7 @@ def get_canonical_smile(smile):
     if smile != 'None':
         mol = rkc.MolFromSmiles(smile)
         if mol is not None:
-            smi = rkc.MolToSmiles(mol, canonical=True, doRandom=False, isomericSmiles=False)
+            smi = rkc.MolToSmiles(mol, canonical=True, doRandom=False, isomericSmiles=True)
             return smi
         else:
             return None

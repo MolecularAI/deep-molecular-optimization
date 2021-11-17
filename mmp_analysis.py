@@ -1,5 +1,6 @@
 import pandas as pd
 import os
+import numpy as np
 import pickle
 import datetime
 import random
@@ -20,9 +21,30 @@ import utils.file as uf
 import utils.chem as uc
 
 nofcuts = 1
-hac, ratio = 40, 0.8
-ratio_list = [33, 50]
+hac, ratio = 40, 0.6 #0.8
+ratio_list = [33, 50] # 33
 topk = 20
+
+
+def add_fakeID_for_prediction(data, num_samples):
+    """
+    Add Fake ID for generated molecules
+    :return: update new data
+    """
+    ID_dict = {}
+    i = 0
+    for j in range(num_samples):
+        predict_smis = data['Predicted_smi_{}'.format(j + 1)].tolist()
+        IDs_list = []
+        for smi in predict_smis:
+            if smi not in ID_dict:
+                ID_dict[smi] = 'Predict{}'.format(i)
+                i += 1
+            IDs_list.append(ID_dict[smi])
+        data['FakeID_{}'.format(j + 1)] = IDs_list
+
+    LOG.info('Assign fake ID for {} different predicted smiles '.format(len(ID_dict)))
+    return data
 
 def prepare_mmp_input(data_test, path, num_samples, is_only_desirable=False):
     mmp_input_mol, mmp_input_ID = [], []
@@ -102,6 +124,8 @@ def generate_mmps(data_test, nofcuts, path, mmpdb_path, num_samples, is_only_des
     batch = 2000
     all_mmps_df_list = []
     number_of_mmps_per_starting_mol = []
+    data_test = add_fakeID_for_prediction(data_test, num_samples)
+
     for j in range(math.ceil(len(data_test) / batch)):
         end = min(len(data_test), j + batch * (j + 1))
         data = data_test[j + batch * j:end]
@@ -149,6 +173,10 @@ def analyse_mmp_results(data_test, mmp_all_df, ratio_list, num_samples, tmp_path
     mmp_row_list_dict, mmp_df_list = {}, []
     for ratio in ratio_list:
         mmp_row_list_dict[ratio] = []
+    is_mmp_dict = {}
+    for ratio in ratio_list:
+        mmp_row_list_dict[ratio] = []
+        is_mmp_dict[ratio] = [[0 for i in range(num_samples)] for j in range(len(data_test))]
     total_valid, not_valid, not_mmps = 0, 0, 0
     for i in range(len(data_test)):
         source_mol_ID = data_test.iloc[i]['Source_Mol_ID']
@@ -178,6 +206,7 @@ def analyse_mmp_results(data_test, mmp_all_df, ratio_list, num_samples, tmp_path
                             if _num_heavy_atoms(row['Transformation'].split('>>')[1]) * 1.0 / _num_heavy_atoms(
                                     row['Target_Smi']) <= ratio / 100.0:
                                 mmp_row_list_dict[ratio].append(row)
+                                is_mmp_dict[ratio][i][j - 1] = 1
                     else:
                         not_mmps += 1
                         pair_smi = (data_test.iloc[i]['Source_Mol'], predict_smi)
@@ -194,6 +223,13 @@ def analyse_mmp_results(data_test, mmp_all_df, ratio_list, num_samples, tmp_path
     with open(os.path.join(tmp_path, "not_mmp_pairs.pkl"), "wb") as output_file:
         pickle.dump(not_mmp_paris, output_file)
 
+    if not is_only_desirable:
+        for ratio in ratio_list:
+            is_mmp_array = np.array(is_mmp_dict[ratio])
+            for i in range(num_samples):
+                data_test[f'is_MMP_{ratio}_{i+1}'] = is_mmp_array[:,i]
+        data_test.to_csv(os.path.join(save_path, 'generated_molecules_prop_statistics_mmp.csv'), index=False)
+
     if is_only_desirable:
         LOG.info(
             f"Ideally should generate {len(data_test)*num_samples} molecules with desirable properties for {len(data_test)} starting molecules")
@@ -201,6 +237,16 @@ def analyse_mmp_results(data_test, mmp_all_df, ratio_list, num_samples, tmp_path
     else:
         LOG.info(f"Theoretically should generate {len(data_test)*num_samples} molecules for {len(data_test)} starting molecules")
         LOG.info(f"In fact generate {total_valid}({round(total_valid/(len(data_test)*num_samples)*100, 2)}%)")
+
+    # Tanimoto
+    sim_list = []
+    for i in range(num_samples):
+        sim_list.extend(data_test[f'Predicted_smi_{i + 1}_tanimoto'].tolist())
+    sim_list_notna = [x for x in sim_list if np.isnan(x) == False]
+    sim_list_notna_threshold = [x for x in sim_list_notna if x >= 0.5]
+    LOG.info(f'Not nan: {round(len(sim_list_notna)*1.0/len(sim_list)*100, 2)}%')
+    LOG.info(f'Tanimoto similarity>=0.5: {round(len(sim_list_notna_threshold)*1.0/len(sim_list_notna)*100, 2)}% within notna, '
+             f'{round(len(sim_list_notna_threshold)*1.0/len(sim_list)*100, 2)}% within all')
 
     for i, df in enumerate(mmp_df_list):
         LOG.info(f"===============Ratio={ratio_list[i]}================")
@@ -222,17 +268,28 @@ def analyse_mmp_results(data_test, mmp_all_df, ratio_list, num_samples, tmp_path
         draw_transformations(topk_transformations, save_path, f"top_{topk}_generated_{ratio_list[i]}")
     return mmp_df_list, not_mmp_paris, total_valid
 
-def transformations_in_train(train_path, mmp_df_list, total_valid):
+def transformations_in_train(train_path, test_path, mmp_df_list, total_valid, num_samples, is_only_desirable):
     # How many in Train and not in Train
     train = pd.read_csv(os.path.join(train_path), sep=",")
     train_transformations = set(train['Transformation'].tolist())
+    train_R_group = set()
+    for transf in train_transformations:
+        train_R_group.update(transf.split('>>'))
     LOG.info(f"Number of samples in Train: {len(train)}")
-    LOG.info(f"Number of unique transformations in Train: {len(train_transformations)}")
+    LOG.info(f"{round(len(train_transformations)/len(train)*100, 2)}% unique transformations in Train")
+    LOG.info(f"{round(len(train_R_group)/len(train)*100, 2)} unique% R groups in Train")
+
+    train_cores = set(train['Core'].tolist())
+    LOG.info(f"{round(len(train_cores)/len(train)*100, 2)} unique% cores in Train")
+
+    data_test = pd.read_csv(test_path, sep=",")
 
     n_exist_transf_in_train = 0
     not_exist_transf_list = []
     exist_unique_list = []
     test_transformations_df = mmp_df_list
+    not_exist_R_group_in_train = 0
+    not_exist_R_group_list = []
     for i in range(len(test_transformations_df)):
         row = test_transformations_df.iloc[i]
         t = row['Transformation']
@@ -241,12 +298,42 @@ def transformations_in_train(train_path, mmp_df_list, total_valid):
             exist_unique_list.append(t)
         else:
             not_exist_transf_list.append(t)
+
+        R_group_generated = t.split('>>')[1]
+        if R_group_generated not in train_R_group:
+            not_exist_R_group_in_train += 1
+            not_exist_R_group_list.append(R_group_generated)
+
+    n_core_presence = 0
+    for i in range(len(data_test)):
+        row = data_test.iloc[i]
+        core_mol = Chem.MolFromSmarts(row['Core'])
+        for j in range(num_samples):
+            try:
+                generated_mol = Chem.MolFromSmiles(row['Predicted_smi_{}'.format(j+1)])
+                if generated_mol.HasSubstructMatch(core_mol):
+                    if is_only_desirable:
+                        if str(row[f'Predict_eval_{j}_allprop']) == '1':
+                            n_core_presence += 1
+                    else:
+                        n_core_presence += 1
+                else:
+                    pass
+                    print(i, j, row)
+            except Exception:
+                pass
+
     LOG.info("Perc. of generated molecules out of MMPs whose transformations are in Train: {}%".format(
         round(n_exist_transf_in_train / len(test_transformations_df) * 100, 2)))
     LOG.info("Perc. of generated molecules out of all generated whose transformations are in Train: {}%".format(
         round(n_exist_transf_in_train / total_valid * 100, 2)))
+    LOG.info("Perc. of generated molecules out of MMPs whose R group are not in Train: {}%".format(
+        round(not_exist_R_group_in_train / len(test_transformations_df) * 100, 2)))
+    LOG.info(f"{round(len(set(not_exist_R_group_list))/len(test_transformations_df)*100, 2)}% unique novel R groups generated")
+    LOG.info("Perc. of generated molecules out of all generated who keep the core: {}%".format(
+        round(n_core_presence / total_valid * 100, 2)))
 
-    return not_exist_transf_list
+    return not_exist_transf_list, not_exist_R_group_list
 
 def transformations_not_in_train(not_exist_transf_list, save_path):
     # Check MMPs not in Train
@@ -255,6 +342,25 @@ def transformations_not_in_train(not_exist_transf_list, save_path):
     LOG.info(f"Top {topk} frequent occured transformations not in Train:")
     LOG.info(topk_transformations)
     draw_transformations(topk_transformations, save_path, 'transformations_not_in_train')
+
+def R_group_not_in_train(not_exist_R_group_list, save_path):
+    # Check MMPs not in Train
+    x = Counter(not_exist_R_group_list)
+    topk_R_group = x.most_common(topk)
+    LOG.info(f"Top {topk} frequent occured R groups not in Train:")
+    LOG.info(topk_R_group)
+    draw_R_group(topk_R_group, save_path, 'R_groups_not_in_train')
+
+def draw_R_group(R_groups, save_path, name):
+    mols = []
+    for r in R_groups:
+        try:
+            mols.append(Chem.MolFromSmiles(r[0]))
+        except Exception:
+            LOG.info(f"Can't draw {r}")
+            pass
+    image = Draw.MolsToGridImage(mols, molsPerRow=1)
+    image.save(os.path.join(save_path, f'{name}.png'), format='png')
 
 def draw_transformations(transformations, save_path, name):
     mols = []
@@ -290,7 +396,7 @@ def draw_not_mmps(not_mmp_paris, save_path):
     image = Draw.MolsToGridImage(mols, molsPerRow=2, subImgSize=(400, 400), highlightAtomLists=matches_list)
     image.save(os.path.join(save_path, f'{name}.png'), format='png')
 
-def perform_mmp_analysis(data_path, train_path, temp_files_path, save_path, mmpdb_path, num_samples, is_only_desirable):
+def perform_mmp_analysis(data_path, temp_files_path, save_path, mmpdb_path, num_samples, is_only_desirable):
     # Read evaluation file containing generated smiles
     data_test = pd.read_csv(data_path)
     LOG.info(f"Number of starting molecules in test file: {len(data_test)}")
@@ -298,8 +404,7 @@ def perform_mmp_analysis(data_path, train_path, temp_files_path, save_path, mmpd
     mmp_all_df = generate_mmps(data_test, nofcuts, temp_files_path, mmpdb_path, num_samples, is_only_desirable)
     mmp_df_list, not_mmp_paris, total_valid = analyse_mmp_results(data_test, mmp_all_df, ratio_list, num_samples,
                                                                   temp_files_path, save_path, is_only_desirable)
-    not_exist_transf_list = transformations_in_train(train_path, mmp_df_list[0], total_valid)
-    transformations_not_in_train(not_exist_transf_list, save_path)
+
 
 def run_main():
     """Main function."""
@@ -320,7 +425,7 @@ def run_main():
         temp_files_path = os.path.join(save_path, 'temp_files', 'MMP')
     uf.make_directory(temp_files_path, is_dir=True)
 
-    perform_mmp_analysis(opt.data_path, opt.train_path, temp_files_path, save_path, opt.mmpdb_path, opt.num_samples,
+    perform_mmp_analysis(opt.data_path, temp_files_path, save_path, opt.mmpdb_path, opt.num_samples,
                          opt.only_desirable)
 
 

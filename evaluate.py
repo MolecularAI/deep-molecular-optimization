@@ -21,7 +21,7 @@ NUM_WORKERS = 16
 class EvaluationRunner:
     """Evaluate the generated molecules"""
 
-    def __init__(self, data_path, num_samples, range_evaluation):
+    def __init__(self, data_path, num_samples, range_evaluation, without_property=False):
 
         self.save_path = uf.get_parent_dir(data_path)
         global LOG
@@ -29,6 +29,7 @@ class EvaluationRunner:
         self.data_path = data_path
         self.data = pd.read_csv(self.data_path, sep=",")
         self.num_samples = num_samples
+        self.without_property = without_property
 
         self.output_path = self.save_path
         self.range_evaluation = range_evaluation
@@ -53,8 +54,10 @@ class EvaluationRunner:
 
         # Draw molecules
         LOG.info("Drawing molecules")
-        image = draw_molecules.get_plot_sample(self.data, nr_of_source_mol=50, range_evaluation=self.range_evaluation)
+        image = draw_molecules.get_plot_sample(self.data, nr_of_source_mol=50, num_samples=self.num_samples,
+                                               range_evaluation=self.range_evaluation, no_property=self.without_property)
         image.save(os.path.join(self.output_path, 'draw_molecules.png'), format='png')
+
 
     def property_stat(self):
         LOG.info("-----------------Looking at properties separately---------------------------")
@@ -159,9 +162,13 @@ class EvaluationRunner:
             with Pool(NUM_WORKERS) as p:
                 results = p.map(uc.tanimoto_similarity_pool, zipped)
             similarities.extend(results)
+            self.data[f'Predicted_smi_{i+1}_tanimoto'] = results
+
         results_not_none = [s for s in similarities if s]
         up.hist_box_list(results_not_none, name="similarity",
                     path=self.output_path, title="Similarity")
+        import statistics
+        LOG.info(f'Tanimoto mean: {statistics.mean(results_not_none)}')
 
 
     def class_prop_stat(self, property_name):
@@ -328,7 +335,7 @@ def run_main():
     opts.evaluation_opts(parser)
     opt = parser.parse_args()
 
-    runner = EvaluationRunner(opt.data_path, opt.num_samples, opt.range_evaluation)
+    runner = EvaluationRunner(opt.data_path, opt.num_samples, opt.range_evaluation, opt.without_property)
     runner.evaluation_statistics()
 
 if __name__ == "__main__":

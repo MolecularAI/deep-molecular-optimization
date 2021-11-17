@@ -1,5 +1,9 @@
 import math
 
+"""
+Default values for parameters
+"""
+
 # Data
 DATA_DEFAULT = {
     'max_sequence_length': 128,

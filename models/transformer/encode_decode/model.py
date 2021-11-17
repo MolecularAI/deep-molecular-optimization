@@ -2,6 +2,9 @@ import torch
 import torch.nn as nn
 import copy
 
+from torch.autograd import Variable
+from models.transformer.module.subsequent_mask import subsequent_mask
+
 from models.transformer.module.positional_encoding import PositionalEncoding
 from models.transformer.module.positionwise_feedforward import PositionwiseFeedForward
 from models.transformer.module.multi_headed_attention import MultiHeadedAttention
@@ -25,10 +28,43 @@ class EncoderDecoder(nn.Module):
         self.tgt_embed = tgt_embed
         self.generator = generator
 
-    def forward(self, src, tgt, src_mask, tgt_mask):
-        "Take in and process masked src and target sequences."
-        return self.decode(self.encode(src, src_mask), src_mask,
-                           tgt, tgt_mask)
+    def forward(self, src, src_mask, **kwargs):
+        if 'mode' in kwargs:
+            if kwargs['mode'] == 'forward':
+                trg = kwargs['trg']
+                trg_mask = kwargs['trg_mask']
+                "Take in and process masked src and target sequences."
+                return self.generator(self.decode(self.encode(src, src_mask), src_mask,
+                                   trg, trg_mask))
+            elif kwargs['mode'] == 'sampling':
+                max_len = kwargs['max_len']
+                sample_type = kwargs['sample_type']
+
+                ys = torch.zeros(src.shape[0], max_len).type_as(src.data)
+                ys[:,0] = 1
+                encoder_outputs = self.encode(src, src_mask)
+                break_condition = torch.zeros(src.shape[0], dtype=torch.bool)
+                for i in range(max_len - 1):
+                    with torch.no_grad():
+                        out = self.decode(encoder_outputs, src_mask, Variable(ys[:,:i+1]),
+                                           Variable(subsequent_mask(ys[:,:i+1].size(1)).type_as(src.data)))
+
+                        log_prob = self.generator(out[:, -1])
+                        prob = torch.exp(log_prob)
+
+                        if sample_type == 'greedy':
+                            _, next_word = torch.max(prob, dim=1)
+                            ys[:,i+1] = next_word
+                        elif sample_type == 'multinomial':
+                            next_word = torch.multinomial(prob, 1)
+                            next_word = torch.squeeze(next_word)
+                            ys[:,i+1] = next_word
+
+                        break_condition = (break_condition | (next_word.to('cpu') == 2))
+                        if all(break_condition):  # end token
+                            break
+
+                return ys
 
     def encode(self, src, src_mask):
         return self.encoder(self.src_embed(src), src_mask)

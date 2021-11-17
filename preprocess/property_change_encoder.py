@@ -1,38 +1,43 @@
 import numpy as np
+import math
 import pandas as pd
 
 import configuration.config_default as cfgd
 
 STEP = 0.2
 
-def encode_property_change(input_data_path, LOG=None):
+def encode_property_change(df, LOG=None):
     property_change_encoder = {}
     for property_name in cfgd.PROPERTIES:
         if property_name == 'LogD':
-            intervals, start_map_interval = build_intervals(input_data_path, step=STEP, LOG=LOG)
-        elif property_name in ['Solubility', 'Clint']:
+            intervals, start_map_interval = build_intervals(df, step=STEP, LOG=LOG)
+        elif property_name in ['Solubility', 'Clint', 'Permeability']:
             intervals = ['low->high', 'high->low', 'no_change']
 
         if property_name == 'LogD':
             property_change_encoder[property_name] = intervals, start_map_interval
-        elif property_name in ['Solubility', 'Clint']:
+        elif property_name in ['Solubility', 'Clint', 'Permeability']:
             property_change_encoder[property_name] = intervals
 
     return property_change_encoder
 
 
 def value_in_interval(value, start_map_interval):
-    start_vals = sorted(list(start_map_interval.keys()))
-    return start_map_interval[start_vals[np.searchsorted(start_vals, value, side='right') - 1]]
+    if not math.isnan(value):
+        start_vals = sorted(list(start_map_interval.keys()))
+        return start_map_interval[start_vals[np.searchsorted(start_vals, value, side='right') - 1]]
+    else:
+        return None
 
 
 def interval_to_onehot(interval, encoder):
     return encoder.transform([interval]).toarray()[0]
 
 
-def build_intervals(input_transformations_path, step=STEP, LOG=None):
-    df = pd.read_csv(input_transformations_path)
-    delta_logD = df['Delta_LogD'].tolist()
+def build_intervals(df, step=STEP, LOG=None):
+    #df = pd.read_csv(input_transformations_path)
+    #delta_logD = df['Delta_LogD'].tolist()
+    delta_logD = df[df['Delta_LogD'].notna()]['Delta_LogD'].tolist()
     min_val, max_val = min(delta_logD), max(delta_logD)
     if LOG:
         LOG.info("LogD min and max: {}, {}".format(min_val, max_val))

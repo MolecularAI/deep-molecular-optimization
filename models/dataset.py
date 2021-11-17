@@ -20,7 +20,7 @@ class Dataset(tud.Dataset):
     Source_Mol_Clint,Target_Mol_Clint,Delta_Clint,
     Transformation,Core"""
 
-    def __init__(self, data, vocabulary, tokenizer, prediction_mode=False):
+    def __init__(self, data, vocabulary, tokenizer, prediction_mode=False, without_property=False):
         """
 
         :param data: dataframe read from training, validation or test file
@@ -32,6 +32,7 @@ class Dataset(tud.Dataset):
         self._tokenizer = tokenizer
         self._data = data
         self._prediction_mode = prediction_mode
+        self._without_property = without_property
 
     def __getitem__(self, i):
         """
@@ -46,10 +47,8 @@ class Dataset(tud.Dataset):
         source_smi = row['Source_Mol']
         source_tokens = []
 
-        for property_name in cfgd.PROPERTIES:
-            if property_name == 'LogD':
-                source_tokens.append(row['Delta_{}'.format(property_name)])
-            else:
+        if not self._without_property:
+            for property_name in cfgd.PROPERTIES:
                 change = row['Delta_{}'.format(property_name)]
                 source_tokens.append(f"{property_name}_{change}")
 

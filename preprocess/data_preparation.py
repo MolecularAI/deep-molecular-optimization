@@ -1,5 +1,6 @@
 import pandas as pd
 import os
+import math
 
 from sklearn.model_selection import train_test_split
 
@@ -48,6 +49,25 @@ def split_data(input_transformations_path, LOG=None):
 
     return train, validation, test
 
+def split_data_temporal(input_transformations_path, LOG=None):
+    data = pd.read_csv(input_transformations_path, sep=",")
+    if LOG:
+        LOG.info("Read %s file" % input_transformations_path)
+
+    train = data[data['Year']<2018]
+    validation = data[data['Year']==2018]
+    test = data[data['Year']>2018]
+
+    if LOG:
+        LOG.info("Train, Validation, Test: %d, %d, %d" % (len(train), len(validation), len(test)))
+
+    parent = uf.get_parent_dir(input_transformations_path)
+    train.to_csv(os.path.join(parent, "train.csv"), index=False)
+    validation.to_csv(os.path.join(parent, "validation.csv"), index=False)
+    test.to_csv(os.path.join(parent, "test.csv"), index=False)
+
+    return train, validation, test
+
 def save_df_property_encoded(file_name, property_change_encoder, LOG=None):
     data = pd.read_csv(file_name, sep=",")
     for property_name in cfgd.PROPERTIES:
@@ -68,11 +88,14 @@ def save_df_property_encoded(file_name, property_change_encoder, LOG=None):
     return output_file
 
 def prop_change(source, target, threshold):
-    if source <= threshold and target > threshold:
-        return "low->high"
-    elif source > threshold and target <= threshold:
-        return "high->low"
-    elif source <= threshold and target <= threshold:
-        return "no_change"
-    elif source > threshold and target > threshold:
-        return "no_change"
+    if math.isnan(source) or math.isnan(target):
+        return None
+    else:
+        if source <= threshold and target > threshold:
+            return "low->high"
+        elif source > threshold and target <= threshold:
+            return "high->low"
+        elif source <= threshold and target <= threshold:
+            return "no_change"
+        elif source > threshold and target > threshold:
+            return "no_change"

@@ -13,12 +13,18 @@ def train_opts(parser):
                        help='Number of training steps')
     group.add_argument('--starting-epoch', type=int, default=1,
                        help="Training from given starting epoch")
+    group.add_argument('--use-data-parallel', help='Use pytorch DataParallel',
+                       action="store_true")
     # Input output settings
     group = parser.add_argument_group('Input-Output')
     group.add_argument('--data-path', required=True,
                        help="""Input data path""")
     group.add_argument('--save-directory', default='train',
                        help="""Result save directory""")
+    # Training mode
+    group = parser.add_argument_group('Training mode')
+    group.add_argument('--without-property', help="""Training without property tokens as input""",
+                       action="store_true")
 
     subparsers = parser.add_subparsers()
     transformer_parser = subparsers.add_parser('transformer')
@@ -99,8 +105,8 @@ def generate_opts(parser):
     group = parser.add_argument_group('Input-Output')
     group.add_argument('--data-path', required=True,
                        help="""Input data path""")
-    group.add_argument('--test-file-name', required=True, help="""test file name without .csv,
-        [test, test_not_in_train, test_unseen_L-1_S01_C10_range]""")
+    group.add_argument('--vocab-path', required=True, help="""Vocabulary path""")
+    group.add_argument('--test-file-name', default='test', help="""test file name without .csv""")
     group.add_argument('--save-directory', default='evaluation',
                        help="""Result save directory""")
     # Model to be used for generating molecules
@@ -114,6 +120,8 @@ def generate_opts(parser):
     group.add_argument('--num-samples', type=int, default=10,
                        help='Number of molecules to be generated')
     group.add_argument('--decode-type',type=str, default='multinomial',help='decode strategy')
+    group.add_argument('--without-property', help="""Without property tokens as input""",
+                       action="store_true")
 
 
 def evaluation_opts(parser):
@@ -130,4 +138,6 @@ def evaluation_opts(parser):
     group.add_argument('--mmpdb-path', help='mmpdb path; download from https://github.com/rdkit/mmpdb')
     group.add_argument('--train-path', help='Training data path')
     group.add_argument('--only-desirable', help='Only check generated molecules with desirable properties',
+                       action="store_true")
+    group.add_argument('--without-property', help="""Draw molecules without property information""",
                        action="store_true")

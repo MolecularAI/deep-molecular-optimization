@@ -20,21 +20,26 @@ class BaseTrainer(ABC):
         self.LOG = LOG
         self.LOG.info(opt)
 
-    def initialize_dataloader(self, data_path, batch_size, vocab, data_type):
+    def initialize_dataloader(self, data_path, batch_size, vocab, data_type, without_property=False):
         # Read train or validation
         data = pd.read_csv(os.path.join(data_path, data_type + '.csv'), sep=",")
-        dataset = md.Dataset(data=data, vocabulary=vocab, tokenizer=mv.SMILESTokenizer(), prediction_mode=False)
+        dataset = md.Dataset(data=data, vocabulary=vocab, tokenizer=mv.SMILESTokenizer(),
+                             prediction_mode=False, without_property=without_property)
         dataloader = torch.utils.data.DataLoader(dataset, batch_size,
                                                  shuffle=True, collate_fn=md.Dataset.collate_fn)
         return dataloader
 
-    def to_tensorboard(self, train_loss, validation_loss, accuracy, epoch):
+    def to_tensorboard(self, train_loss, validation_loss, accuracy, token_accuracy, similarities, epoch):
 
         self.summary_writer.add_scalars("loss", {
             "train": train_loss,
             "validation": validation_loss
         }, epoch)
-        self.summary_writer.add_scalar("accuracy/validation", accuracy, epoch)
+        self.summary_writer.add_scalars("validation", {
+            "accuracy": accuracy,
+            "token accuracy": token_accuracy
+        }, epoch)
+        self.summary_writer.add_scalar("similarity/validation", similarities, epoch)
 
         self.summary_writer.close()
 

@@ -147,8 +147,10 @@ class Seq2SeqTrainer(BaseTrainer):
             vocab = pkl.load(input_file)
 
         # Data loader
-        dataloader_train = self.initialize_dataloader(opt.data_path, opt.batch_size, vocab, 'train')
-        dataloader_validation = self.initialize_dataloader(opt.data_path, opt.batch_size, vocab, 'validation')
+        dataloader_train = self.initialize_dataloader(opt.data_path, opt.batch_size, vocab, 'train',
+                                                      without_property=opt.without_property)
+        dataloader_validation = self.initialize_dataloader(opt.data_path, opt.batch_size, vocab, 'validation',
+                                                           without_property=opt.without_property)
 
         device = ut.allocate_gpu()
 

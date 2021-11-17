@@ -23,7 +23,7 @@ class GenerateRunner():
 
     def __init__(self, opt):
 
-        self.save_path = os.path.join('experiments', opt.save_directory, opt.test_file_name,
+        self.save_path = os.path.join(opt.save_directory, opt.test_file_name,
                                       f'evaluation_{opt.epoch}')
         global LOG
         LOG = ul.get_logger(name="generate",
@@ -32,23 +32,25 @@ class GenerateRunner():
         LOG.info("Save directory: {}".format(self.save_path))
 
         # Load vocabulary
-        with open(os.path.join(opt.data_path, 'vocab.pkl'), "rb") as input_file:
+        with open(opt.vocab_path, "rb") as input_file:
             vocab = pkl.load(input_file)
         self.vocab = vocab
         self.tokenizer = mv.SMILESTokenizer()
 
-    def initialize_dataloader(self, opt, vocab, test_file):
+    def initialize_dataloader(self, opt, vocab, test_file, without_property=False):
         """
         Initialize dataloader
         :param opt:
         :param vocab: vocabulary
         :param test_file: test_file_name
+        :param without_property: not include property tokens as input
         :return:
         """
 
         # Read test
         data = pd.read_csv(os.path.join(opt.data_path, test_file + '.csv'), sep=",")
-        dataset = md.Dataset(data=data, vocabulary=vocab, tokenizer=self.tokenizer, prediction_mode=True)
+        dataset = md.Dataset(data=data, vocabulary=vocab, tokenizer=self.tokenizer,
+                             prediction_mode=True, without_property=without_property)
         dataloader = torch.utils.data.DataLoader(dataset, opt.batch_size,
                                                  shuffle=False, collate_fn=md.Dataset.collate_fn)
         return dataloader
@@ -59,7 +61,8 @@ class GenerateRunner():
         device = ut.allocate_gpu()
 
         # Data loader
-        dataloader_test = self.initialize_dataloader(opt, self.vocab, opt.test_file_name)
+        dataloader_test = self.initialize_dataloader(opt, self.vocab, opt.test_file_name,
+                                                     without_property=opt.without_property)
 
         # Load model
         file_name = os.path.join(opt.model_path, f'model_{opt.epoch}.pt')
@@ -72,6 +75,7 @@ class GenerateRunner():
             # move to GPU
             model.network.encoder.to(device)
             model.network.decoder.to(device)
+
         max_len = cfgd.DATA_DEFAULT['max_sequence_length']
         df_list = []
         sampled_smiles_list = []
@@ -82,12 +86,13 @@ class GenerateRunner():
             # Move to GPU
             src = src.to(device)
             src_mask = src_mask.to(device)
-            smiles= self.sample(opt.model_choice, model, src, src_mask,
+            smiles = self.sample(opt.model_choice, model, src, src_mask,
                                                                        source_length,
                                                                        opt.decode_type,
                                                                        num_samples=opt.num_samples,
                                                                        max_len=max_len,
-                                                                       device=device)
+                                                                       device=device,
+                                                                       without_property=opt.without_property)
 
             df_list.append(df)
             sampled_smiles_list.extend(smiles)
@@ -105,7 +110,7 @@ class GenerateRunner():
 
     def sample(self, model_choice, model, src, src_mask, source_length, decode_type, num_samples=10,
                max_len=cfgd.DATA_DEFAULT['max_sequence_length'],
-               device=None):
+               device=None, without_property=False):
         batch_size = src.shape[0]
         num_valid_batch = np.zeros(batch_size)  # current number of unique and valid samples out of total sampled
         num_valid_batch_total = np.zeros(batch_size)  # current number of sampling times no matter unique or valid
@@ -125,7 +130,7 @@ class GenerateRunner():
 
         # Set of unique starting molecules
         if src is not None:
-            start_ind = len(cfgd.PROPERTIES)
+            start_ind = 0 if without_property else len(cfgd.PROPERTIES)
             for ibatch in range(batch_size):
                 source_smi = self.tokenizer.untokenize(self.vocab.decode(src[ibatch].tolist()[start_ind:]))
                 source_smi = uc.get_canonical_smile(source_smi)
@@ -199,6 +204,47 @@ class GenerateRunner():
                 topk_list.extend([self.tokenizer.untokenize(self.vocab.decode(seq))])
             smiles_list.append(topk_list)
 
+        return smiles_list
+
+    def sample_raw(self, model_choice, model, src, src_mask, source_length, decode_type, num_samples=10,
+               max_len=cfgd.DATA_DEFAULT['max_sequence_length'],
+               device=None):
+        batch_size = src.shape[0]
+        # zeros correspondes to ****** which is valid according to RDKit
+        sequences_all = torch.ones((num_samples, batch_size, max_len))
+        sequences_all = sequences_all.type(torch.LongTensor)
+
+        with torch.no_grad():
+            if model_choice == 'seq2seq':
+                encoder_outputs, decoder_hidden = model.network.encoder(src, source_length)
+
+            # sample molecule
+            for i in range(num_samples):
+                if model_choice == 'transformer':
+                    sequences = decode(model, src, src_mask, max_len, decode_type)
+                    padding = (0, max_len-sequences.shape[1],
+                               0, 0)
+                    sequences = torch.nn.functional.pad(sequences, padding)
+                elif model_choice == 'seq2seq':
+                    batch_index_current = torch.LongTensor(range(batch_size)).to(device)
+                    sequences = self.sample_seq2seq(model, src_mask, batch_index_current, decoder_hidden,
+                                                    encoder_outputs, max_len, device)
+                else:
+                    LOG.info('Specify transformer or seq2seq for model_choice')
+
+                sequences_all[i, :, :] = sequences
+
+        # Convert to SMILES
+        smiles_list = [] # [batch, topk]
+        seqs = np.asarray(sequences_all.numpy())
+        # [num_sample, batch_size, max_len]
+        batch_size = len(seqs[0])
+        for ibatch in range(batch_size):
+            topk_list = []
+            for k in range(num_samples):
+                seq = seqs[k, ibatch, :]
+                topk_list.extend([self.tokenizer.untokenize(self.vocab.decode(seq))])
+            smiles_list.append(topk_list)
 
         return smiles_list
 

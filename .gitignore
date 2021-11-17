@@ -1,5 +1,8 @@
 temp/
 log/
+data/
+jobs/
+experiments/
 
 compute_properties.py
 
