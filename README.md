@@ -13,6 +13,8 @@ The same Transformer architecture is trained on different datasets. These datase
 
 Each resulting model takes a starting molecule and user-specified desirable sets of property changes as input, and output a molecule. Multiple molecules can be generated using multinomial sampling. The way the input molecule is tranformed reflects the nature of the dataset used for training the model. 
 
+The pre-trained models are available at [here](https://doi.org/10.5281/zenodo.5707626).
+
 ## Usage
 Create environment 
 
@@ -24,7 +26,7 @@ The examples below illustrate the usage for the MMP dataset. Other datasets can 
 
 **1. Preprocess data**
 
- Encode property change, build vocabulary, and split data into train, validation and test. Outputs are saved in the same directory with input data path. We have provided the input data, and the preprocessed output data in [to be published](todo).
+ Encode property change, build vocabulary, and split data into train, validation and test. Outputs are saved in the same directory with input data path. We have provided the input data, and the preprocessed output data [here](https://doi.org/10.5281/zenodo.5707626).
 
 To preprocess the MMP dataset,
 ```
@@ -55,7 +57,7 @@ where `--data-path` specifies the directory where test.csv is located.
 
 **4. Compute properties for generated molecules**
 
-Since we build the property prediction model based on the in-house experimental data, we can't make it public. But we have provided the results from computing the properties, which can be found [to be published](here).
+Since we build the property prediction model based on the in-house experimental data, we can't make it public. But we have provided the results from computing the properties, which can be found [here](https://doi.org/10.5281/zenodo.5707626).
 
 **5. Evaluate the generated molecules in term of satisfying the desirable properties and draw molecules**
 
