@@ -1,7 +1,7 @@
 ![Maturity level-0](https://img.shields.io/badge/Maturity%20Level-ML--0-red)
 # Transformer Neural Network-Based Molecular Optimization Using General Transformations
 ## Description
-This repository holds the code for [Transformer Neural Network-Based Molecular Optimization Using General Transformations](todo). 
+This repository holds the code for [Transformer Neural Network-Based Molecular Optimization Using General Transformations](https://doi.org/10.26434/chemrxiv-2021-z8rk6). 
 
 The same Transformer architecture is trained on different datasets. These datasets consist of a set of molecular pairs, and were prepared to reflect different types of transformations for molecular optimization. Below are the datasets used,
 - **Matched molecule paris (MMPs)**: two molecules differ by a single transformation, and the transformation is not bigger than 33% of the whole molecule.
