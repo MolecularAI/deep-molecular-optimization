@@ -1,3 +1,5 @@
+**Please note: this repository is no longer being maintained.**
+
 ![Maturity level-0](https://img.shields.io/badge/Maturity%20Level-ML--0-red)
 # Molecular Optimization by Capturing Chemist's Intuition Using Deep Neural Networks
 ## Description
